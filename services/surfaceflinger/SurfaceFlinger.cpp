@@ -4063,7 +4063,7 @@ bool SurfaceFlinger::configureLocked() {
                         {.enableFrameRateOverride =
                                  sysprop::enable_frame_rate_override(true) || isVrrConfigured,
                          .frameRateMultipleThreshold =
-                                 base::GetIntProperty("debug.sf.frame_rate_multiple_threshold"s, 0),
+                                 base::GetIntProperty("debug.sf.frame_rate_multiple_threshold"s, 60),
                          .legacyIdleTimerTimeout = idleTimerTimeoutMs,
                          .kernelIdleTimerController = kernelIdleTimerController};
 
