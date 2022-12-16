@@ -417,6 +417,7 @@ private:
     void kernelIdleTimerCallback(PhysicalDisplayId, TimerState) EXCLUDES(mDisplayLock);
     void idleTimerCallback(PhysicalDisplayId, TimerState);
     void touchTimerCallback(TimerState);
+    void heuristicIdleTimerCallback(TimerState);
     void displayPowerTimerCallback(PhysicalDisplayId, TimerState);
 
     // VsyncSchedule delegate.
@@ -564,6 +565,9 @@ private:
     ftl::Optional<OneShotTimer> mTouchTimer;
     // Timers used to monitor display power mode.
     ui::PhysicalDisplayMap<PhysicalDisplayId, std::unique_ptr<OneShotTimer>> mDisplayPowerTimers;
+    // Timer used to enter idle refresh rate in heuristic layers.
+    std::optional<OneShotTimer> mHeuristicIdleTimer;
+    static constexpr std::chrono::milliseconds HEURISTIC_TIMEOUT = 3000ms;
 
     bool mShouldStartPowerTimers GUARDED_BY(kMainThreadContext) = false;
 
@@ -658,6 +662,7 @@ private:
         // Policy for choosing the display mode.
         LayerHistory::Summary contentRequirements;
         ui::PhysicalDisplayMap<PhysicalDisplayId, TimerState> idleTimers;
+        TimerState heuristicIdleTimer = TimerState::Reset;
         TouchState touch = TouchState::Inactive;
         ui::PhysicalDisplayMap<PhysicalDisplayId, TimerState> displayPowerTimers;
         ui::PhysicalDisplayMap<PhysicalDisplayId, hal::PowerMode> displayPowerModes;
