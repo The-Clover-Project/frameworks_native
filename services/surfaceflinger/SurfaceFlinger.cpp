@@ -509,7 +509,7 @@ SurfaceFlinger::SurfaceFlinger(Factory& factory) : SurfaceFlinger(factory, SkipI
     useHwcForRgbToYuv = force_hwc_copy_for_virtual_displays(false);
 
     int64_t buffers = max_frame_buffer_acquired_buffers(2);
-    maxFrameBufferAcquiredBuffers = buffers < 3 ? buffers : 6;
+    maxFrameBufferAcquiredBuffers = buffers < 3 ? buffers : 3;
 
     minAcquiredBuffers =
             SurfaceFlingerProperties::min_acquired_buffers().value_or(minAcquiredBuffers);
