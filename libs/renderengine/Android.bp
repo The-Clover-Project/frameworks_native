@@ -150,7 +150,10 @@ cc_library_static {
         "-fvisibility=hidden",
         "-Werror=format",
         "-Wno-unused-parameter",
-    ],
+    ] + select(soong_config_variable("cloverVarsPlugin", "gaussian_blur_high_quality"), {
+        true: ["-DGAUSSIAN_INPUT_SCALE=0.25f"],
+        default: [],
+    }),
     srcs: [
         ":librenderengine_sources",
         ":librenderengine_threaded_sources",
