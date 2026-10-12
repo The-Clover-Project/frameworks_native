@@ -51,6 +51,7 @@
 #include <SkString.h>
 #include <SkSurface.h>
 #include <SkTileMode.h>
+#include <android-base/properties.h>
 #include <android-base/stringprintf.h>
 #include <android/ipcrenderbuffer/RenderBufferHelpers.h>
 #include <common/FlagManager.h>
@@ -271,17 +272,27 @@ static inline bool isLayerFullyTransparent(const android::renderengine::LayerSet
     return layer.alpha <= 0.001f;
 }
 
+static bool stackedBlurEnabled() {
+    static const bool sEnabled = base::GetBoolProperty("persist.sys.sf.stacked_blur", true);
+    return sEnabled;
+}
+
 static inline bool isBlurCoveringMostOfScreen(const android::renderengine::LayerSettings& layer,
                                              const android::renderengine::DisplaySettings& display) {
     if (layer.backgroundBlurRadius <= 0) {
         return false;
     }
-    const float layerW = layer.geometry.boundaries.getWidth();
-    const float clipW = static_cast<float>(display.clip.getWidth());
-    if (clipW <= 0.0f) {
+    if (layer.alpha < 0.5f) {
         return false;
     }
-    return layerW >= clipW * 0.7f;
+    const float layerW = layer.geometry.boundaries.getWidth();
+    const float layerH = layer.geometry.boundaries.getHeight();
+    const float clipW = static_cast<float>(display.clip.getWidth());
+    const float clipH = static_cast<float>(display.clip.getHeight());
+    if (clipW <= 0.0f || clipH <= 0.0f) {
+        return false;
+    }
+    return layerW >= clipW * 0.7f && layerH >= clipH * 0.5f;
 }
 
 static inline float computeOccludedBlurScale(float higherBlur) {
@@ -1180,27 +1191,25 @@ void SkiaRenderEngine::drawLayersInternal(
         uint32_t effectiveBackgroundBlurRadius = 0;
 
         if (shouldProcessBlur) {
-            float higherBlurRadius = 0.0f;
-            for (const auto* higherLayer = &layer + 1;
-                 higherLayer < layers.data() + layers.size(); ++higherLayer) {
-                if (isLayerFullyTransparent(*higherLayer)) {
-                    continue;
+            if (stackedBlurEnabled()) {
+                float higherBlurRadius = 0.0f;
+                for (const auto* higherLayer = &layer + 1;
+                     higherLayer < layers.data() + layers.size(); ++higherLayer) {
+                    if (isLayerFullyTransparent(*higherLayer)) {
+                        continue;
+                    }
+                    if (isBlurCoveringMostOfScreen(*higherLayer, display)) {
+                        higherBlurRadius = std::max(higherBlurRadius,
+                                static_cast<float>(higherLayer->backgroundBlurRadius));
+                    }
                 }
-                if (isBlurCoveringMostOfScreen(*higherLayer, display)) {
-                    higherBlurRadius = std::max(higherBlurRadius,
-                            static_cast<float>(higherLayer->backgroundBlurRadius));
-                }
+
+                blurScale = computeOccludedBlurScale(higherBlurRadius);
+
+                const float higherBlurForRegions = std::max(
+                        higherBlurRadius, static_cast<float>(layer.backgroundBlurRadius));
+                regionBlurScale = computeOccludedBlurScale(higherBlurForRegions);
             }
-
-            blurScale = computeOccludedBlurScale(higherBlurRadius);
-
-            float higherBlurForRegions = higherBlurRadius;
-            if (layer.backgroundBlurRadius > 0) {
-                higherBlurForRegions = std::max(higherBlurForRegions,
-                        static_cast<float>(layer.backgroundBlurRadius));
-            }
-
-            regionBlurScale = computeOccludedBlurScale(higherBlurForRegions);
 
             effectiveBackgroundBlurRadius =
                     static_cast<uint32_t>(std::round(layer.backgroundBlurRadius * blurScale));
